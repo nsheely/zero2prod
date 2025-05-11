@@ -76,7 +76,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # install + run tarpaulin (no upload)
       - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --version 0.28.0 --locked
+        run: cargo install cargo-tarpaulin
       - name: Run tarpaulin
         run: |
           cargo tarpaulin --workspace --all-features --timeout 120 \
@@ -98,7 +98,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-audit
-        run: cargo install cargo-audit --version 0.20.0 --locked
+        run: cargo install cargo-audit
       - name: Audit dependencies
         run: cargo audit --deny warnings
 
