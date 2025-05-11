@@ -1,22 +1,118 @@
-name: Rust
+# .github/workflows/ci.yml – Rust CI pipeline
+name: Rust CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+#--------------------------------------------------------------------
+# Common reusable “steps” snippet (checkout + toolchain + cache)
+#--------------------------------------------------------------------
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  build:
-
+  # ────────────────────────────────────────────────────────────
+  check:
+    name: 🛠️  cargo check
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-features
+
+  # ────────────────────────────────────────────────────────────
+  test:
+    name: 🧪 test suite
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --all-features --verbose
+
+  # ────────────────────────────────────────────────────────────
+  fmt:
+    name: 🎨 rustfmt
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  # ────────────────────────────────────────────────────────────
+  clippy:
+    name: 🔍 clippy
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # ────────────────────────────────────────────────────────────
+  coverage:
+    name: 📊 code coverage
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # install + run tarpaulin (no upload)
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --version 0.28.0 --locked
+      - name: Run tarpaulin
+        run: |
+          cargo tarpaulin --workspace --all-features --timeout 120 \
+            --out Xml --out Html
+      # keep the reports as artifacts for manual inspection
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            tarpaulin-report.xml
+            tarpaulin-report.html
+
+  # ────────────────────────────────────────────────────────────
+  security_audit:
+    name: 🛡️  cargo-audit
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --version 0.20.0 --locked
+      - name: Audit dependencies
+        run: cargo audit --deny warnings
+
+  # ────────────────────────────────────────────────────────────
+  build:
+    name: 📦 release build
+    runs-on: ubuntu-latest
+    needs: [fmt, clippy, security_audit, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --workspace --all-features --verbose
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: target/release/
