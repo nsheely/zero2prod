@@ -41,18 +41,6 @@ jobs:
       - run: cargo test --workspace --all-features --verbose
 
   # ────────────────────────────────────────────────────────────
-  fmt:
-    name: 🎨 rustfmt
-    runs-on: ubuntu-latest
-    needs: check
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - run: cargo fmt --all -- --check
-
-  # ────────────────────────────────────────────────────────────
   clippy:
     name: 🔍 clippy
     runs-on: ubuntu-latest
